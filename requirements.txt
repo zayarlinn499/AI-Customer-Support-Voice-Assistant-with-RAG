@@ -1,11 +1,15 @@
 streamlit
 python-dotenv
 faster-whisper
+langchain
 langchain-groq
 langchain-huggingface
 langchain-qdrant
 qdrant-client
+sentence-transformers
 elevenlabs
-pypdf
-sounddevice
 soundfile
+pypdf
+torch
+ctranslate2
+huggingface-hub
