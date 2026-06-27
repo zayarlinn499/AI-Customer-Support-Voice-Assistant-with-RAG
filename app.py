@@ -1,4 +1,6 @@
 import os
+os.environ["STREAMLIT_SERVER_ENABLE_FILE_WATCHER"] = "false"
+import os
 import shutil
 from pathlib import Path
 
@@ -339,4 +341,4 @@ if audio_value is not None:
     with col2:
         if st.button("🎤 Ask Another Question", use_container_width=True, type="primary"):
             st.session_state.input_key += 1
-            st.rerun()
+            st.rerun()
