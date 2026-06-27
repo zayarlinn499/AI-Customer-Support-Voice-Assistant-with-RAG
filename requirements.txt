@@ -11,5 +11,6 @@ elevenlabs
 soundfile
 pypdf
 torch
+torchvision
 ctranslate2
 huggingface-hub
