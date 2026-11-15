@@ -1,3 +1,12 @@
+---
+title: AI Voice Customer Support with RAG
+emoji: 🎙️
+colorFrom: blue
+colorTo: purple
+sdk: docker
+app_port: 8501
+---
+
 # AI Customer Support Voice Assistant with RAG
 
 An end-to-end AI-powered voice assistant that automates customer support using Speech-to-Text (STT), Retrieval-Augmented Generation (RAG), Large Language Models (LLMs), and Text-to-Speech (TTS).
