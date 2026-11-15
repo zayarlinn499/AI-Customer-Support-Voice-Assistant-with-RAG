@@ -1,8 +1,10 @@
 streamlit
 python-dotenv
 faster-whisper
+av<18
 langchain-groq
 langchain-huggingface
+sentence-transformers
 langchain-qdrant
 qdrant-client
 elevenlabs

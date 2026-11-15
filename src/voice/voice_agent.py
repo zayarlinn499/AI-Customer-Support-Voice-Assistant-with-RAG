@@ -31,7 +31,17 @@ def speech_to_text(audio_path):
         compute_type="int8"
     )
 
-    segments, info = whisper.transcribe(str(audio_path))
+    company_prompt = (
+        "Customer call with ABC Electronics customer support. "
+        "Topics include consumer electronics, smart home devices, computer accessories, "
+        "shipping policy, delivery timelines, tracking, returns, warranties, and refund policies."
+    )
+
+    segments, info = whisper.transcribe(
+        str(audio_path),
+        initial_prompt=company_prompt,
+        beam_size=5
+    )
 
     question = ""
 
@@ -43,7 +53,9 @@ def speech_to_text(audio_path):
 
 def get_rag_answer(question):
     llm = ChatGroq(
-        model="llama-3.3-70b-versatile"
+        model=os.getenv("GROQ_MODEL", "qwen/qwen3.8-27b"),
+        max_tokens=int(os.getenv("GROQ_MAX_TOKENS", "500")),
+        temperature=float(os.getenv("GROQ_TEMPERATURE", "0.6"))
     )
 
     embeddings = HuggingFaceEmbeddings(
@@ -58,7 +70,7 @@ def get_rag_answer(question):
 
     docs = vector_store.similarity_search(
         question,
-        k=3
+        k=4
     )
 
     context = "\n\n".join(
@@ -66,18 +78,27 @@ def get_rag_answer(question):
     )
 
     prompt = f"""
-You are a professional customer support assistant.
+You are a warm, helpful customer support representative for ABC Electronics speaking directly to a customer on a phone call.
 
-Answer ONLY from the provided context.
+The customer's question is transcribed from real-time speech and may be informal, slightly complex, rambling, or contain speech-to-text imperfections/typos.
+Always interpret the customer's intent through the lens of ABC Electronics products, shipping, warranty, returns, and refund policies.
 
-If the answer is not found in the context, say:
-"I couldn't find that information in the company knowledge base."
+Guidelines for your response:
+1. Decode the core intent: Overlook background noise, filler words ("um", "like", "you know"), or garbled transcription words by mapping what they said to the relevant ABC Electronics topic.
+2. Grounded in facts: Answer accurately using the company context below. Never invent new policies.
+3. Natural phone demeanor: Speak as the company itself in a warm, polite first-person voice ("We provide...", "You can return..."). Never say "According to the context" or "Based on the documents".
+4. NO markdown or symbols: Never use asterisks, bullet points, numbered lists, or bold tags, because this response will be read aloud through text-to-speech.
+5. Keep it concise: 2 to 4 spoken sentences that directly resolve the customer's question.
+6. If the audio is completely unintelligible noise, or if the question cannot be answered from the context, respond gracefully:
+   "I'm sorry, I didn't quite catch that clearly. Could you please clarify what you need help with regarding your ABC Electronics product or order?"
 
 Context:
 {context}
 
-Question:
+Customer Question:
 {question}
+
+Spoken Response:
 """
 
     response = llm.invoke(prompt)

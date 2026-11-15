@@ -15,9 +15,9 @@ import pypdf
 import re
 
 
-load_dotenv()
-
 BASE_DIR = Path(__file__).resolve().parent
+load_dotenv(BASE_DIR / ".env")
+load_dotenv()
 AUDIO_DIR = BASE_DIR / "audio"
 INPUT_AUDIO = AUDIO_DIR / "ui_input.wav"
 OUTPUT_AUDIO = AUDIO_DIR / "ui_response.mp3"
@@ -75,14 +75,27 @@ def load_vector_store():
 @st.cache_resource
 def load_llm():
     return ChatGroq(
-        model="llama-3.3-70b-versatile"
+        model=os.getenv("GROQ_MODEL", "qwen/qwen3.8-27b"),
+        max_tokens=int(os.getenv("GROQ_MAX_TOKENS", "500")),
+        temperature=float(os.getenv("GROQ_TEMPERATURE", "0.6"))
     )
 
 
 def speech_to_text(audio_path):
     whisper = load_whisper()
 
-    segments, info = whisper.transcribe(str(audio_path))
+    # Domain vocabulary prompt to prime Whisper with company context and prevent hearing phonetic nonsense
+    company_prompt = (
+        "Customer call with ABC Electronics customer support. "
+        "Topics include consumer electronics, smart home devices, computer accessories, "
+        "shipping policy, delivery timelines, tracking, returns, warranties, and refund policies."
+    )
+
+    segments, info = whisper.transcribe(
+        str(audio_path),
+        initial_prompt=company_prompt,
+        beam_size=5
+    )
 
     question = ""
 
@@ -98,24 +111,33 @@ def get_rag_answer(question):
 
     docs = vector_store.similarity_search(
         question,
-        k=3
+        k=4
     )
 
     context = "\n\n".join(doc.page_content for doc in docs)
 
     prompt = f"""
-You are a professional customer support assistant.
+You are a warm, helpful customer support representative for ABC Electronics speaking directly to a customer on a phone call.
 
-Answer ONLY from the provided context.
+The customer's question is transcribed from real-time speech and may be informal, slightly complex, rambling, or contain speech-to-text imperfections/typos.
+Always interpret the customer's intent through the lens of ABC Electronics products, shipping, warranty, returns, and refund policies.
 
-If the answer is not found in the context, say:
-"I couldn't find that information in the company knowledge base."
+Guidelines for your response:
+1. Decode the core intent: Overlook background noise, filler words ("um", "like", "you know"), or garbled transcription words by mapping what they said to the relevant ABC Electronics topic.
+2. Grounded in facts: Answer accurately using the company context below. Never invent new policies.
+3. Natural phone demeanor: Speak as the company itself in a warm, polite first-person voice ("We provide...", "You can return..."). Never say "According to the context" or "Based on the documents".
+4. NO markdown or symbols: Never use asterisks, bullet points, numbered lists, or bold tags, because this response will be read aloud through text-to-speech.
+5. Keep it concise: 2 to 4 spoken sentences that directly resolve the customer's question.
+6. If the audio is completely unintelligible noise, or if the question cannot be answered from the context, respond gracefully:
+   "I'm sorry, I didn't quite catch that clearly. Could you please clarify what you need help with regarding your ABC Electronics product or order?"
 
 Context:
 {context}
 
-Question:
+Customer Question:
 {question}
+
+Spoken Response:
 """
 
     response = llm.invoke(prompt)
@@ -318,19 +340,24 @@ if audio_value is not None:
                     with st.spinner("Searching knowledge base..."):
                         answer = get_rag_answer(question)
                         
-                    with st.spinner("Generating voice response..."):
-                        response_audio = text_to_speech(answer)
-                        history_audio_path = AUDIO_DIR / f"response_{st.session_state.input_key}.mp3"
-                        shutil.copy(response_audio, history_audio_path)
+                    history_audio_path = None
+                    try:
+                        with st.spinner("Generating voice response..."):
+                            response_audio = text_to_speech(answer)
+                            history_audio_path = AUDIO_DIR / f"response_{st.session_state.input_key}.mp3"
+                            shutil.copy(response_audio, history_audio_path)
+                    except Exception as e:
+                        st.warning(f"Voice generation skipped (ElevenLabs): {e}")
                         
                     st.write(answer)
-                    st.audio(str(history_audio_path), format="audio/mp3", autoplay=True)
+                    if history_audio_path and history_audio_path.exists():
+                        st.audio(str(history_audio_path), format="audio/mp3", autoplay=True)
                     
                 # Append to history
                 st.session_state.history.append({
                     "question": question,
                     "answer": answer,
-                    "audio": str(history_audio_path)
+                    "audio": str(history_audio_path) if history_audio_path else ""
                 })
 
     # Action Button to Ask Another Question
@@ -339,4 +366,4 @@ if audio_value is not None:
     with col2:
         if st.button("🎤 Ask Another Question", use_container_width=True, type="primary"):
             st.session_state.input_key += 1
-            st.rerun()
+            st.rerun()

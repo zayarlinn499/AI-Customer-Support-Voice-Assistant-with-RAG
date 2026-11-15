@@ -1,3 +1,4 @@
+import os
 from dotenv import load_dotenv
 
 from langchain_groq import ChatGroq
@@ -8,7 +9,9 @@ load_dotenv()
 
 # LLM
 llm = ChatGroq(
-    model="llama-3.3-70b-versatile"
+    model=os.getenv("GROQ_MODEL", "qwen/qwen3.8-27b"),
+    max_tokens=int(os.getenv("GROQ_MAX_TOKENS", "500")),
+    temperature=float(os.getenv("GROQ_TEMPERATURE", "0.6"))
 )
 
 # Embeddings
@@ -40,13 +43,16 @@ while True:
     )
 
     prompt = f"""
-Answer the user's question using only the context below.
+You are a warm, helpful customer support representative speaking to a customer.
+Answer the customer's question using ONLY the provided context, but in a natural, polite, and human conversational tone without markdown, bullet points, or robotic phrases like "According to the context".
 
 Context:
 {context}
 
-Question:
+Customer Question:
 {question}
+
+Response:
 """
 
     response = llm.invoke(prompt)

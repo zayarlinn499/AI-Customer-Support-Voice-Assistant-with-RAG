@@ -4,3 +4,4 @@ __pycache__/
 *.pyc
 audio/*.wav
 audio/*.mp3
+*.lock
